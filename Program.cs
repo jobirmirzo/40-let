@@ -48,6 +48,8 @@ builder.Services.AddKippo<KippoHandler>(builder.Configuration)
     .AddKippoMiddleware<SessionMiddleware>();
 var app = builder.Build();
 
+await app.InitializeDatabaseAsync();
+
 app.UseAuthentication();
 app.UseAuthorization();
 

@@ -23,7 +23,7 @@ jobs:
       - name: Build and push image
         uses: docker/build-push-action@v6
         with:
-          context: .        
+          context: ./backend
           push: true
           tags: ghcr.io/jobirmirzo/40-let-backend:latest
 

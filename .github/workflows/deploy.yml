@@ -39,7 +39,7 @@ jobs:
           port: ${{ secrets.SERVER_PORT }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            cd ~/app
+            cd /srv/projects/40let/backend
             docker compose pull backend
             docker compose up -d backend
             docker image prune -f

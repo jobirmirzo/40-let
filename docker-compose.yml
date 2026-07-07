@@ -1,21 +1,23 @@
 services:
+  backend:
+    image: ghcr.io/jobirmirzo/40-let-backend:latest
+    restart: unless-stopped
+    ports:
+      - "5000:8080"          # host:container — ASP.NET listens on 8080 in the container
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+
   postgres:
-    image: postgres:17-alpine
-    container_name: fortylet-postgres
+    image: postgres:16
     restart: unless-stopped
     environment:
-      POSTGRES_USER: fortylet
-      POSTGRES_PASSWORD: N38s039Qbv7W3ZzACuAWIEK
-      POSTGRES_DB: fortylet
-    ports:
-      - "5433:5432"
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
-      - fortylet_pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U fortylet -d fortylet"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+      - pg_data:/var/lib/postgresql/data
 
 volumes:
-  fortylet_pgdata:
+  pg_data:

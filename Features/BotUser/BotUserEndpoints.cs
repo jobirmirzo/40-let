@@ -9,7 +9,6 @@ public static class BotUserEndpoints
     {
         var group = app.MapGroup("/users").WithTags("Users");
 
-        // GET /users/me -> the user identified by the bearer token.
         group.MapGet("/me", async (ClaimsPrincipal principal, IBotUserService users) =>
         {
             var sub = principal.FindFirstValue(JwtRegisteredClaimNames.Sub);
@@ -26,6 +25,9 @@ public static class BotUserEndpoints
 
         group.MapGet("/{id:long}", async (long id, IBotUserService users) =>
             await users.GetById(id) is { } user ? Results.Ok(user) : Results.NotFound());
+
+        group.MapGet("/by-chat/{chatId:long}", async (long chatId, IBotUserService users) =>
+            await users.GetByChatId(chatId) is { } user ? Results.Ok(user) : Results.NotFound());
 
         group.MapPost("/", async (BotUserView view, IBotUserService users) =>
         {

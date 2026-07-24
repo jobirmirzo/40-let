@@ -22,6 +22,15 @@ public class AuthService(AppDbContext context, IOptions<JwtOptions> options) : I
         return user is null ? null : GenerateToken(user);
     }
 
+    public async Task<TokenView?> LoginByClientId(long clientId)
+    {
+        var user = await context.BotUsers
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Id == clientId);
+
+        return user is null ? null : GenerateToken(user);
+    }
+
     private TokenView GenerateToken(BotUser user)
     {
         var expiresAt = DateTime.UtcNow.AddMinutes(_jwt.ExpiryMinutes);
@@ -31,7 +40,10 @@ public class AuthService(AppDbContext context, IOptions<JwtOptions> options) : I
             new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             new("chat_id", user.ChatId.ToString()),
-            new(ClaimTypes.Role, user.Role ?? "user")
+            // Short "role" rather than the ClaimTypes.Role URI so the Mini App can
+            // read it straight out of the payload. Program.cs matches it via
+            // TokenValidationParameters.RoleClaimType.
+            new("role", user.Role ?? "user")
         };
 
         if (!string.IsNullOrWhiteSpace(user.PhoneNumber))

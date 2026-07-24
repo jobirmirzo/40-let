@@ -1,3 +1,4 @@
+using _40Let.Enum;
 using _40Let.Models;
 
 namespace _40Let.Features;
@@ -15,6 +16,7 @@ public interface IOrderService
 
     Task<Order> Create(OrderView view);
     Task<bool> Update(long id, OrderView view);
+    Task<bool> UpdateStatus(long id, Status status);
     Task<bool> Delete(long id);
 
     #endregion

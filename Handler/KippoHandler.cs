@@ -63,16 +63,14 @@ public class KippoHandler(IServiceScopeFactory scopeFactory) : BotUpdateHandler
 
         using var scope = scopeFactory.CreateScope();
         var userService = GetService<IBotUserService>(scope);
-        if (await userService.GetByChatId(chatId) == null)
-        {
-            await userService.Create(view);
-        }
-        
+        var user = await userService.GetByChatId(chatId) ?? await userService.Create(view);
+
+      
         var reply = new ReplyKeyboardMarkup(new[]
         {
             new KeyboardButton("Open the menu")
             {
-                WebApp = new WebAppInfo { Url = $"https://tough-actually-imp.ngrok-free.app?role={role}" }
+                WebApp = new WebAppInfo { Url = $"https://tough-actually-imp.ngrok-free.app?clientId={user.Id}" }
             }
         })
         {

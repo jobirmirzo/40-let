@@ -4,17 +4,22 @@ using _40Let.Data;
 using _40Let.Extensions;
 using _40Let.Features;
 using _40Let.Handler;
+using FortyLet.Storage;
 using Kippo.Extensions;
 using Kippo.Middleware;
 using Minio;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.Net.Http.Headers;
 using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 var services = builder.Services;
-
+var cfg = builder.Configuration;
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Postgres")));
 
@@ -24,16 +29,6 @@ services.AddScoped<IBotUserService, BotUserService>();
 
 #endregion
 
-#region minio
-builder.Services.Configure<MinioOptions>(builder.Configuration.GetSection(MinioOptions.SectionName));
-var minio = builder.Configuration.GetSection(MinioOptions.SectionName).Get<MinioOptions>()!;
-
-builder.Services.AddSingleton<IMinioClient>(_ => new MinioClient()
-    .WithEndpoint(minio.Endpoint)
-    .WithCredentials(minio.AccessKey, minio.SecretKey)
-    .WithSSL(minio.UseSSL)
-    .Build());
-#endregion
 builder.Services.AddServicesByConvention();
 
 // EF fixes up navigations both ways, so an Order -> Items -> Order cycle would
@@ -63,7 +58,12 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             RoleClaimType = "role"
         };
     });
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    options.FallbackPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+});
 #endregion
 
 #region swagger
@@ -76,29 +76,85 @@ builder.Services.AddSwaggerGen(options =>
         Version = "v1"
     });
 
-    // JWT bearer support: lets you click "Authorize" and paste a token.
-    var scheme = new OpenApiSecurityScheme
+    options.AddSecurityDefinition(JwtBearerDefaults.AuthenticationScheme, new OpenApiSecurityScheme
     {
-        Name = "Authorization",
         Type = SecuritySchemeType.Http,
         Scheme = "bearer",
         BearerFormat = "JWT",
         In = ParameterLocation.Header,
-        Description = "Enter the JWT returned by POST /auth/token (no \"Bearer \" prefix needed).",
-        Reference = new OpenApiReference
-        {
-            Type = ReferenceType.SecurityScheme,
-            Id = JwtBearerDefaults.AuthenticationScheme
-        }
-    };
-    options.AddSecurityDefinition(JwtBearerDefaults.AuthenticationScheme, scheme);
+        Description = "Enter the JWT returned by POST /auth/token (no \"Bearer \" prefix needed)."
+    });
+
     options.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
-        [scheme] = Array.Empty<string>()
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = JwtBearerDefaults.AuthenticationScheme
+                }
+            },
+            Array.Empty<string>()
+        }
     });
 });
 #endregion
 
+#region CORS
+
+var configuredOrigins = cfg.GetSection("Cors:AllowedOrigins").Get<string[]>();
+var defaultOrigins = new[]
+{
+    "https://tough-actually-imp.ngrok-free.app/",
+    "https://tough-actually-imp.ngrok-free.app",
+    "http://localhost:3003",
+    "http://localhost:3003/"
+};
+
+var allowedOrigins = (configuredOrigins is { Length: > 0 } ? configuredOrigins : defaultOrigins)
+    .Where(x => !string.IsNullOrWhiteSpace(x))
+    .Select(x => x.Trim().TrimEnd('/'))
+    .Distinct(StringComparer.OrdinalIgnoreCase)
+    .ToArray();
+
+
+services.AddCors(cors => cors.AddDefaultPolicy(
+    policy => policy
+        .WithOrigins(allowedOrigins)
+        .AllowCredentials()
+        .AllowAnyHeader()
+        .AllowAnyMethod()
+        .WithExposedHeaders(HeaderNames.ContentDisposition)
+));
+services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
+#endregion
+
+#region Minio
+
+services.AddOptions<MinioOptions>()
+    .Bind(builder.Configuration.GetSection(MinioOptions.SectionName))
+    .ValidateDataAnnotations();
+
+services.AddSingleton<IMinioClient>(sp =>
+{
+    var opts = sp.GetRequiredService<IOptions<MinioOptions>>().Value;
+    return new MinioClient()
+        .WithEndpoint(opts.Endpoint)
+        .WithCredentials(opts.AccessKey, opts.SecretKey)
+        .WithSSL(opts.UseSSL)
+        .Build();
+});
+
+services.AddScoped<IMinioService, MinioService>();
+#endregion
 builder.Services.Configure<WebAppOptions>(builder.Configuration.GetSection(WebAppOptions.SectionName));
 
 builder.Services.AddKippo<KippoHandler>(builder.Configuration)
@@ -111,21 +167,22 @@ app.UseSwagger();
 app.UseSwaggerUI(options =>
 {
     options.SwaggerEndpoint("/swagger/v1/swagger.json", "40Let API v1");
-    // Swagger UI available at /swagger (root "/" is taken by the Hello World endpoint).
     options.RoutePrefix = "swagger";
 });
+
+app.UseCors();
 
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapGet("/", () => "Hello World!");
+
+app.MapGet("/", () => "Hello World!").AllowAnonymous();
 
 app.MapAuthEndpoints();
 app.MapFoodEndpoints();
 app.MapBotUserEndpoints();
 app.MapOrderEndpoints();
 app.MapCheckEndpoints();
-app.MapFileEndpoints();
 
 
 app.Run();

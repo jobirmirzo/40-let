@@ -4,7 +4,9 @@ public static class AuthEndpoints
 {
     public static IEndpointRouteBuilder MapAuthEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/auth").WithTags("Auth");
+        // Open to the world: this is where a caller gets a token in the first
+        // place, so it can't itself require one.
+        var group = app.MapGroup("/auth").WithTags("Auth").AllowAnonymous();
 
         // POST /auth/token -> issues a signed JWT for a known user.
         group.MapPost("/token", async (LoginView view, IAuthService auth) =>

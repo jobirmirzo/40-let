@@ -1,5 +1,6 @@
 using _40Let.Data;
 using _40Let.Models;
+using FortyLet.Storage;
 using Microsoft.EntityFrameworkCore;
 
 namespace _40Let.Features;
@@ -14,7 +15,7 @@ public class FoodService(AppDbContext context, IMinioService storage) : IFoodSer
     {
         var foods = await context.Foods.AsNoTracking().ToListAsync();
         foreach (var food in foods)
-            food.Image = await storage.GetPresignedUrlAsync(food.Image);
+            food.Image = await ToUrl(food.Image);
         return foods;
     }
 
@@ -22,7 +23,7 @@ public class FoodService(AppDbContext context, IMinioService storage) : IFoodSer
     {
         var food = await context.Foods.AsNoTracking().FirstOrDefaultAsync(f => f.Id == id);
         if (food is not null)
-            food.Image = await storage.GetPresignedUrlAsync(food.Image);
+            food.Image = await ToUrl(food.Image);
         return food;
     }
     #endregion
@@ -38,7 +39,7 @@ public class FoodService(AppDbContext context, IMinioService storage) : IFoodSer
         await context.Foods.AddAsync(entity);
         await context.SaveChangesAsync();
 
-        entity.Image = await storage.GetPresignedUrlAsync(entity.Image);
+        entity.Image = await ToUrl(entity.Image);
         return entity;
     }
 
@@ -48,17 +49,24 @@ public class FoodService(AppDbContext context, IMinioService storage) : IFoodSer
         if (entity is null)
             return false;
 
+        var oldKey = entity.Image;     
         _mapper.Update(view, entity);
 
-        // Only replace the stored image when a new file is supplied.
         if (view.ImageFile is not null)
         {
-            var oldKey = entity.Image;
             entity.Image = await storage.UploadAsync(view.ImageFile, Folder);
-            await storage.DeleteAsync(oldKey);
+            await context.SaveChangesAsync();
+
+          
+            if (!string.IsNullOrEmpty(oldKey) && oldKey != entity.Image)
+                await storage.DeleteAsync(oldKey);
+        }
+        else
+        {
+            entity.Image = oldKey; 
+            await context.SaveChangesAsync();
         }
 
-        await context.SaveChangesAsync();
         return true;
     }
 
@@ -68,10 +76,18 @@ public class FoodService(AppDbContext context, IMinioService storage) : IFoodSer
         if (entity is null)
             return false;
 
-        await storage.DeleteAsync(entity.Image);
+        var key = entity.Image;
+
         context.Foods.Remove(entity);
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync();   // remove the row first
+
+        if (!string.IsNullOrEmpty(key))
+            await storage.DeleteAsync(key);  // then the object
+
         return true;
     }
     #endregion
+
+    private async Task<string> ToUrl(string key)
+        => string.IsNullOrEmpty(key) ? key : await storage.GetPresignedUrlAsync(key);
 }

@@ -99,6 +99,8 @@ builder.Services.AddSwaggerGen(options =>
 });
 #endregion
 
+builder.Services.Configure<WebAppOptions>(builder.Configuration.GetSection(WebAppOptions.SectionName));
+
 builder.Services.AddKippo<KippoHandler>(builder.Configuration)
     .AddKippoMiddleware<SessionMiddleware>();
 var app = builder.Build();

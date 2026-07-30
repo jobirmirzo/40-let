@@ -5,12 +5,13 @@ using Kippo.Contexs;
 using Kippo.Extensions;
 using Kippo.Handlers;
 using Kippo.Keyboard;
+using Microsoft.Extensions.Options;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.ReplyMarkups;
 
 namespace _40Let.Handler;
 
-public class KippoHandler(IServiceScopeFactory scopeFactory) : BotUpdateHandler
+public class KippoHandler(IServiceScopeFactory scopeFactory, IOptions<WebAppOptions> webAppOptions) : BotUpdateHandler
 {
     [Command("start")]
     public async Task Start(Context context)
@@ -70,7 +71,7 @@ public class KippoHandler(IServiceScopeFactory scopeFactory) : BotUpdateHandler
         {
             new KeyboardButton("Open the menu")
             {
-                WebApp = new WebAppInfo { Url = $"https://tough-actually-imp.ngrok-free.app?clientId={user.Id}" }
+                WebApp = new WebAppInfo { Url = $"{webAppOptions.Value.Url}?clientId={user.Id}" }
             }
         })
         {

@@ -23,3 +23,8 @@ services:
 
 volumes:
   pg_data:
+
+networks:
+  default:
+    name: 40let-network
+    external: true

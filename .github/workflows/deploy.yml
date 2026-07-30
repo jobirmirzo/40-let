@@ -39,6 +39,7 @@ jobs:
           port: ${{ secrets.SERVER_PORT }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            docker network create 40let-network 2>/dev/null || true
             cd /srv/projects/40let/backend
             docker compose pull backend
             docker compose up -d backend

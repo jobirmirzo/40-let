@@ -1,3 +1,4 @@
+using _40Let.Enum;
 using _40Let.Features;
 using _40Let.Models;
 using Kippo.Attribute;
@@ -11,30 +12,80 @@ using Telegram.Bot.Types.ReplyMarkups;
 
 namespace _40Let.Handler;
 
-public class KippoHandler(IServiceScopeFactory scopeFactory, IOptions<WebAppOptions> webAppOptions) : BotUpdateHandler
+public class KippoHandler(
+    IServiceScopeFactory scopeFactory,
+    IOptions<WebAppOptions> webAppOptions,
+    IOptions<SuperAdminOptions> superAdminOptions) : BotUpdateHandler
 {
     [Command("start")]
     public async Task Start(Context context)
     {
-        // var reply = new ReplyKeyboardMarkup(new[]
-        // {
-        //     new KeyboardButton("Open the menu")
-        //     {
-        //         WebApp = new WebAppInfo { Url = "https://tough-actually-imp.ngrok-free.app?role=admin" }
-        //     }
-        // })
-        // {
-        //     ResizeKeyboard = true,
-        //     OneTimeKeyboard = true
-        // };
+        var chatId = context.ChatId;
+
+        if (superAdminOptions.Value.IsSuperAdmin(chatId))
+        {
+            await StartSuperAdmin(context, chatId);
+            return;
+        }
 
         var reply = ReplyKeyboardBuilder.Create()
             .ContactButton("Share Contact")
             .Resize()
             .Build();
-        
+
         context.Session?.Data["state"] = "awaiting_contact";
         await context.Reply("Welcome to my bot! Choose an option:", reply);
+    }
+
+    /// <summary>
+    /// A superadmin is authorized purely by chat id (from config), not by
+    /// sharing a phone number, so their BotUser row is bootstrapped right here
+    /// instead of waiting on the contact-share flow — they're never asked to
+    /// share contact at all. They get both the normal menu button and an
+    /// extra "Manage admins" button that opens a dedicated Mini App page
+    /// (?page=admins) for promoting/demoting other users.
+    /// </summary>
+    private async Task StartSuperAdmin(Context context, long chatId)
+    {
+        using var scope = scopeFactory.CreateScope();
+        var userService = GetService<IBotUserService>(scope);
+
+        var user = await userService.GetByChatId(chatId);
+        if (user is null)
+        {
+            var from = context.Update.Message?.From;
+            user = await userService.Create(new BotUserView
+            {
+                ChatId = chatId,
+                Fullname = from is null ? null : $"{from.FirstName} {from.LastName}".Trim(),
+                PhoneNumber = null,
+                Role = Role.SuperAdmin
+            });
+        }
+
+        var reply = new ReplyKeyboardMarkup(new[]
+        {
+            new[]
+            {
+                new KeyboardButton("Open the menu")
+                {
+                    WebApp = new WebAppInfo { Url = $"{webAppOptions.Value.Url}?clientId={user.Id}" }
+                }
+            },
+            new[]
+            {
+                new KeyboardButton("Adminlarni boshqarish")
+                {
+                    WebApp = new WebAppInfo { Url = $"{webAppOptions.Value.Url}?clientId={user.Id}&page=admins" }
+                }
+            }
+        })
+        {
+            ResizeKeyboard = true,
+            OneTimeKeyboard = true
+        };
+
+        await context.Reply("Welcome back, superadmin! Choose an option:", reply);
     }
 
     [Contact]
@@ -52,7 +103,7 @@ public class KippoHandler(IServiceScopeFactory scopeFactory, IOptions<WebAppOpti
         var phoneNumber = string.IsNullOrWhiteSpace(rawPhoneNumber)
             ? ""
             : rawPhoneNumber.Replace("+", "").Replace(" ", "");
-        var role = phoneNumber == "998950645042" ? "admin" : "user";
+        var role = phoneNumber == "998950645042" ? Role.Admin : Role.User;
         
         var view = new BotUserView
         {

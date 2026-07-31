@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json.Serialization;
 using _40Let.Data;
+using _40Let.Enum;
 using _40Let.Extensions;
 using _40Let.Features;
 using _40Let.Handler;
@@ -63,8 +64,12 @@ builder.Services.AddAuthorization(options =>
     options.FallbackPolicy = new AuthorizationPolicyBuilder()
         .RequireAuthenticatedUser()
         .Build();
+
+    options.AddPolicy("SuperAdmin", policy => policy.RequireRole(nameof(Role.SuperAdmin)));
 });
 #endregion
+
+builder.Services.Configure<SuperAdminOptions>(builder.Configuration.GetSection(SuperAdminOptions.SectionName));
 
 #region swagger
 builder.Services.AddEndpointsApiExplorer();

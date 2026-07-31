@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using _40Let.Data;
+using _40Let.Enum;
 using _40Let.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -43,7 +44,7 @@ public class AuthService(AppDbContext context, IOptions<JwtOptions> options) : I
             // Short "role" rather than the ClaimTypes.Role URI so the Mini App can
             // read it straight out of the payload. Program.cs matches it via
             // TokenValidationParameters.RoleClaimType.
-            new("role", user.Role ?? "user")
+            new("role", (user.Role ?? Role.User).ToString())
         };
 
         if (!string.IsNullOrWhiteSpace(user.PhoneNumber))

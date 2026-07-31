@@ -1,4 +1,5 @@
 using _40Let.Data;
+using _40Let.Enum;
 using _40Let.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -38,6 +39,14 @@ public class BotUserService(AppDbContext context) : IBotUserService
         _mapper.Update(view, entity);
         await context.SaveChangesAsync();
         return true;
+    }
+
+    public async Task<bool> UpdateRole(long id, Role role)
+    {
+        var affected = await context.BotUsers
+            .Where(u => u.Id == id)
+            .ExecuteUpdateAsync(s => s.SetProperty(u => u.Role, role));
+        return affected > 0;
     }
 
     public async Task<bool> Delete(long id)

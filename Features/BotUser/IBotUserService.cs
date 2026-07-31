@@ -1,3 +1,4 @@
+using _40Let.Enum;
 using _40Let.Models;
 
 namespace _40Let.Features;
@@ -16,6 +17,7 @@ public interface IBotUserService
 
     Task<BotUser> Create(BotUserView view);
     Task<bool> Update(long id, BotUserView view);
+    Task<bool> UpdateRole(long id, Role role);
     Task<bool> Delete(long id);
 
     #endregion

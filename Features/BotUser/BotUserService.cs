@@ -49,6 +49,26 @@ public class BotUserService(AppDbContext context) : IBotUserService
         return affected > 0;
     }
 
+    public async Task<BotUser> EnsureSuperAdmin(long chatId, string? fullname)
+    {
+        var entity = await context.BotUsers.FirstOrDefaultAsync(u => u.ChatId == chatId);
+        if (entity is null)
+        {
+            entity = new BotUser { ChatId = chatId, Fullname = fullname, Role = Role.SuperAdmin };
+            await context.BotUsers.AddAsync(entity);
+            await context.SaveChangesAsync();
+            return entity;
+        }
+
+        if (entity.Role != Role.SuperAdmin)
+        {
+            entity.Role = Role.SuperAdmin;
+            await context.SaveChangesAsync();
+        }
+
+        return entity;
+    }
+
     public async Task<bool> Delete(long id)
     {
         var affected = await context.BotUsers

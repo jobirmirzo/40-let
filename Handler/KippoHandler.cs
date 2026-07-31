@@ -41,8 +41,11 @@ public class KippoHandler(
     /// A superadmin is authorized purely by chat id (from config), not by
     /// sharing a phone number, so their BotUser row is bootstrapped right here
     /// instead of waiting on the contact-share flow — they're never asked to
-    /// share contact at all. They get both the normal menu button and an
-    /// extra "Manage admins" button that opens a dedicated Mini App page
+    /// share contact at all. This runs on every /start, so a chat id that was
+    /// already registered under some other role (e.g. plain "user", from
+    /// before it was added to SuperAdmin:ChatIds) gets promoted too, not just
+    /// brand-new chat ids. They get both the normal menu button and an extra
+    /// "Manage admins" button that opens a dedicated Mini App page
     /// (?page=admins) for promoting/demoting other users.
     /// </summary>
     private async Task StartSuperAdmin(Context context, long chatId)
@@ -50,18 +53,9 @@ public class KippoHandler(
         using var scope = scopeFactory.CreateScope();
         var userService = GetService<IBotUserService>(scope);
 
-        var user = await userService.GetByChatId(chatId);
-        if (user is null)
-        {
-            var from = context.Update.Message?.From;
-            user = await userService.Create(new BotUserView
-            {
-                ChatId = chatId,
-                Fullname = from is null ? null : $"{from.FirstName} {from.LastName}".Trim(),
-                PhoneNumber = null,
-                Role = Role.SuperAdmin
-            });
-        }
+        var from = context.Update.Message?.From;
+        var fullname = from is null ? null : $"{from.FirstName} {from.LastName}".Trim();
+        var user = await userService.EnsureSuperAdmin(chatId, fullname);
 
         var reply = new ReplyKeyboardMarkup(new[]
         {

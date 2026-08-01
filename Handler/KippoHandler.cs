@@ -97,7 +97,10 @@ public class KippoHandler(
         var phoneNumber = string.IsNullOrWhiteSpace(rawPhoneNumber)
             ? ""
             : rawPhoneNumber.Replace("+", "").Replace(" ", "");
-        var role = phoneNumber == "998950645042" ? Role.Admin : Role.User;
+        
+        Role role = Role.User;
+        if (phoneNumber is "998950645042" or "998909763696")
+            role = Role.Admin;
         
         var view = new BotUserView
         {

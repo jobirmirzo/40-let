@@ -10,8 +10,11 @@ public class OrderService(AppDbContext context) : IOrderService
     private readonly OrderMapper _mapper = new();
 
     #region Queries
-    public Task<List<Order>> GetAll()
-        => context.Orders.AsNoTracking().Include(o => o.Items).ToListAsync();
+    public Task<List<Order>> GetAll(long userId)
+        => context.Orders.AsNoTracking()
+            .Include(o => o.Items)
+            .Where(o => context.BotUserOrders.Any(link => link.OrderId == o.Id && link.UserId == userId))
+            .ToListAsync();
 
     public Task<Order?> GetById(long id)
         => context.Orders.AsNoTracking().Include(o => o.Items)
@@ -19,11 +22,15 @@ public class OrderService(AppDbContext context) : IOrderService
     #endregion
 
     #region Mutations
-    public async Task<Order> Create(OrderView view)
+    public async Task<Order> Create(OrderView view, long userId)
     {
         var entity = _mapper.ToEntity(view);
         await context.Orders.AddAsync(entity);
         await context.SaveChangesAsync();
+
+        await context.BotUserOrders.AddAsync(new BotUserOrder { OrderId = entity.Id, UserId = userId });
+        await context.SaveChangesAsync();
+
         return entity;
     }
 

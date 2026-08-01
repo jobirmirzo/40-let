@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using _40Let.Extensions;
 using _40Let.Models;
 using Microsoft.AspNetCore.Mvc;
 
@@ -9,11 +11,19 @@ public static class OrderEndpoints
     {
         var group = app.MapGroup("/orders").WithTags("Orders");
 
-        group.MapGet("/", async (IOrderService orders) =>
-            Results.Ok(await orders.GetAll()))
+        group.MapGet("/", async (ClaimsPrincipal principal, IOrderService orders) =>
+        {
+            var userId = principal.GetUserId();
+            if (userId is null)
+                return Results.Unauthorized();
+
+            return Results.Ok(await orders.GetAll(userId.Value));
+        })
+            .RequireAuthorization()
             .WithName("GetOrders")
-            .WithSummary("List all orders")
-            .Produces<List<Order>>();
+            .WithSummary("List the current user's orders")
+            .Produces<List<Order>>()
+            .Produces(StatusCodes.Status401Unauthorized);
 
         group.MapGet("/{id:long}", async (long id, IOrderService orders) =>
             await orders.GetById(id) is { } order ? Results.Ok(order) : Results.NotFound())
@@ -22,14 +32,20 @@ public static class OrderEndpoints
             .Produces<Order>()
             .Produces(StatusCodes.Status404NotFound);
 
-        group.MapPost("/", async (OrderView view, IOrderService orders) =>
+        group.MapPost("/", async (OrderView view, ClaimsPrincipal principal, IOrderService orders) =>
         {
-            var order = await orders.Create(view);
+            var userId = principal.GetUserId();
+            if (userId is null)
+                return Results.Unauthorized();
+
+            var order = await orders.Create(view, userId.Value);
             return Results.Created($"/orders/{order.Id}", order);
         })
+            .RequireAuthorization()
             .WithName("CreateOrder")
-            .WithSummary("Create an order")
-            .Produces<Order>(StatusCodes.Status201Created);
+            .WithSummary("Create an order for the current user")
+            .Produces<Order>(StatusCodes.Status201Created)
+            .Produces(StatusCodes.Status401Unauthorized);
 
         group.MapPut("/{id:long}", async (long id, OrderView view, IOrderService orders) =>
             await orders.Update(id, view) ? Results.NoContent() : Results.NotFound())

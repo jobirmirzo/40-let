@@ -7,14 +7,14 @@ public interface IOrderService
 {
     #region Queries
 
-    Task<List<Order>> GetAll();
+    Task<List<Order>> GetAll(long userId);
     Task<Order?> GetById(long id);
 
     #endregion
 
     #region Mutations
 
-    Task<Order> Create(OrderView view);
+    Task<Order> Create(OrderView view, long userId);
     Task<bool> Update(long id, OrderView view);
     Task<bool> UpdateStatus(long id, Status status);
     Task<bool> Delete(long id);

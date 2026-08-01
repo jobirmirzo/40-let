@@ -10,8 +10,13 @@ public class BotUserService(AppDbContext context) : IBotUserService
     private readonly BotUserMapper _mapper = new();
 
     #region Queries
-    public Task<List<BotUser>> GetAll()
-        => context.BotUsers.AsNoTracking().ToListAsync();
+
+    public async Task<List<BotUser>> GetAll()
+    {
+        var users = await context.BotUsers.AsNoTracking().ToListAsync();
+        return users;
+    }
+       
 
     public Task<BotUser?> GetById(long id)
         => context.BotUsers.AsNoTracking().FirstOrDefaultAsync(u => u.Id == id);

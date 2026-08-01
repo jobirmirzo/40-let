@@ -1,3 +1,5 @@
+using _40Let.Enum;
+
 namespace _40Let.Models;
 
 public class BotUser
@@ -6,6 +8,6 @@ public class BotUser
     public string? Fullname { get; set; }
     public string? PhoneNumber { get; set; }
     public long ChatId { get; set; }
-    public string? Role { get; set; }
+    public Role? Role { get; set; }
     public ICollection<BotUserHistory>? BotUserHistory { get; set; }
 }

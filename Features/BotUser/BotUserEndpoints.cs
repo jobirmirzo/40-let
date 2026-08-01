@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using _40Let.Enum;
 using _40Let.Models;
 
 namespace _40Let.Features;
@@ -28,21 +29,24 @@ public static class BotUserEndpoints
 
         group.MapGet("/", async (IBotUserService users) =>
             Results.Ok(await users.GetAll()))
+            .RequireAuthorization("SuperAdmin")
             .WithName("GetUsers")
-            .WithSummary("List all users")
+            .WithSummary("List all users (superadmin only)")
             .Produces<List<BotUser>>();
 
         group.MapGet("/{id:long}", async (long id, IBotUserService users) =>
             await users.GetById(id) is { } user ? Results.Ok(user) : Results.NotFound())
+            .RequireAuthorization("SuperAdmin")
             .WithName("GetUserById")
-            .WithSummary("Get a user by id")
+            .WithSummary("Get a user by id (superadmin only)")
             .Produces<BotUser>()
             .Produces(StatusCodes.Status404NotFound);
 
         group.MapGet("/by-chat/{chatId:long}", async (long chatId, IBotUserService users) =>
             await users.GetByChatId(chatId) is { } user ? Results.Ok(user) : Results.NotFound())
+            .RequireAuthorization("SuperAdmin")
             .WithName("GetUserByChatId")
-            .WithSummary("Get a user by Telegram chat id")
+            .WithSummary("Get a user by Telegram chat id (superadmin only)")
             .Produces<BotUser>()
             .Produces(StatusCodes.Status404NotFound);
 
@@ -51,21 +55,44 @@ public static class BotUserEndpoints
             var user = await users.Create(view);
             return Results.Created($"/users/{user.Id}", user);
         })
+            .RequireAuthorization("SuperAdmin")
             .WithName("CreateUser")
-            .WithSummary("Create a user")
+            .WithSummary("Create a user (superadmin only)")
             .Produces<BotUser>(StatusCodes.Status201Created);
 
         group.MapPut("/{id:long}", async (long id, BotUserView view, IBotUserService users) =>
             await users.Update(id, view) ? Results.NoContent() : Results.NotFound())
+            .RequireAuthorization("SuperAdmin")
             .WithName("UpdateUser")
-            .WithSummary("Update a user")
+            .WithSummary("Update a user (superadmin only)")
             .Produces(StatusCodes.Status204NoContent)
             .Produces(StatusCodes.Status404NotFound);
 
+        group.MapPatch("/{id:long}/role", async (long id, UpdateRoleView view, IBotUserService users) =>
+        {
+            // Superadmin status only ever comes from SuperAdmin:ChatIds config,
+            // never from this endpoint — it can only move a user between plain
+            // user and admin.
+            if (!System.Enum.IsDefined(view.Role) || view.Role == Role.SuperAdmin)
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    [nameof(view.Role)] = [$"'{view.Role}' can't be assigned through this endpoint."]
+                });
+
+            return await users.UpdateRole(id, view.Role) ? Results.NoContent() : Results.NotFound();
+        })
+            .RequireAuthorization("SuperAdmin")
+            .WithName("UpdateUserRole")
+            .WithSummary("Promote or demote a user between plain user and admin (superadmin only)")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status404NotFound)
+            .ProducesValidationProblem();
+
         group.MapDelete("/{id:long}", async (long id, IBotUserService users) =>
             await users.Delete(id) ? Results.NoContent() : Results.NotFound())
+            .RequireAuthorization("SuperAdmin")
             .WithName("DeleteUser")
-            .WithSummary("Delete a user")
+            .WithSummary("Delete a user (superadmin only)")
             .Produces(StatusCodes.Status204NoContent)
             .Produces(StatusCodes.Status404NotFound);
 

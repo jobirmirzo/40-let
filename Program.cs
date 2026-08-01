@@ -21,6 +21,11 @@ using Microsoft.OpenApi.Models;
 var builder = WebApplication.CreateBuilder(args);
 var services = builder.Services;
 var cfg = builder.Configuration;
+
+// Kestrel's default (~28.6MB) is usually enough for a phone photo, but iPhone
+// HEIC "Live Photo" uploads can run larger — give food image uploads headroom.
+builder.WebHost.ConfigureKestrel(options =>
+    options.Limits.MaxRequestBodySize = 50 * 1024 * 1024);
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Postgres")));
 
